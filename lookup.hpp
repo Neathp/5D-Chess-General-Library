@@ -52,7 +52,7 @@ namespace Chess5D {
   };
 
   enum MoveType: U8 {
-    Normal, Capture, Push, Enpassant, Promotion, PromoCapture, Castle, Travel, TravelCapture, TravelPromotion, TravelPromoCapture, NullMove
+    NullMove, Normal, Capture, Push, Enpassant, Promotion, PromoCapture, Castle, Travel, TravelCapture, TravelPromotion, TravelPromoCapture, 
   };
 
   struct TMask
@@ -67,9 +67,31 @@ namespace Chess5D {
     return Piece(2 * Type + White);
   }
 
+  _Compiletime static PieceType fromPiece(Piece p) {
+      return static_cast<PieceType>(p / 2);
+  }
+
   _Compiletime static char pieceToChar(const Piece p) {
     const char label[25] {'p', 'P', 'n', 'N', 'b', 'B', 'r', 'R', 'q', 'Q', 'k', 'K', 's', 'S', 'c', 'C', 'y', 'Y', 'w', 'W', 'u', 'U', 'd', 'D', '.'};
     return label[p];
+  }
+
+  _Compiletime static PieceType charToPieceType(const char ch) {
+    switch(toupper(ch)) {
+      case 'P': return Pawn;
+      case 'N': return Knight;
+      case 'B': return Bishop;
+      case 'R': return Rook;
+      case 'Q': return Queen;
+      case 'K': return King;
+      case 'S': return Princess;
+      case 'C': return CKing;
+      case 'Y': return RQueen;
+      case 'W': return Brawn;
+      case 'U': return Unicorn;
+      case 'D': return Dragon;
+    }
+    return NoType;
   }
 
   _Compiletime static Piece charToPiece(const char ch) {
@@ -102,6 +124,16 @@ namespace Chess5D {
     }
     return NoPiece;
   }
+
+  constexpr uint64_t RANKMASK[8] = {
+    0x00000000000000FF, 0x000000000000FF00, 0x0000000000FF0000, 0x00000000FF000000,
+    0x000000FF00000000, 0x0000FF0000000000, 0x00FF000000000000, 0xFF00000000000000
+  };
+
+  constexpr uint64_t FILEMASK[8] = {
+    0x0101010101010101, 0x0202020202020202, 0x0404040404040404, 0x0808080808080808,
+    0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080
+  };
 };
 
 const std::string sqToString[64] = {
@@ -116,6 +148,7 @@ const std::string sqToString[64] = {
 };
 
 namespace Lookup {
+
   _Compiletime static U64 KnightAttacks[64] = {
     0x0000000000020400, 0x0000000000050800, 0x00000000000A1100, 0x0000000000142200, 0x0000000000284400, 0x0000000000508800, 0x0000000000A01000, 0x0000000000402000,
     0x0000000002040004, 0x0000000005080008, 0x000000000A110011, 0x0000000014220022, 0x0000000028440044, 0x0000000050880088, 0x00000000A0100010, 0x0000000040200020,
@@ -4333,11 +4366,8 @@ namespace Lookup {
     return Type == Chess5D::Knight   ? KnightAttacks[sq]
          : Type == Chess5D::Bishop   ? BishopAttacks[sq][occ]
          : Type == Chess5D::Rook     ? RookAttacks[sq][occ]
-         : Type == Chess5D::Queen    ? BishopAttacks[sq][occ] | RookAttacks[sq][occ]
-         : Type == Chess5D::King     ? KingAttacks[sq]
-         : Type == Chess5D::CKing    ? KingAttacks[sq]
-         : Type == Chess5D::Princess ? BishopAttacks[sq][occ] | RookAttacks[sq][occ]
-         : Type == Chess5D::RQueen   ? BishopAttacks[sq][occ] | RookAttacks[sq][occ]
+         : Type == Chess5D::King || Type == Chess5D::CKing  ? KingAttacks[sq]
+         : Type == Chess5D::RQueen || Type == Chess5D::Princess || Type == Chess5D::Queen   ? BishopAttacks[sq][occ] | RookAttacks[sq][occ]
                                      : 0x0000000000000000; 
   }
 

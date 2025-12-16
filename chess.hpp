@@ -19,17 +19,24 @@ namespace Chess5D
     U8 timelineNum[2]{0, 0};
     U8 activeNum[2]{0, 0};
     U8 present=0; //should be stored and updated each time a moveset is made
+    U8 actionNum=0; //should be stored and updated each time a moveset is made
 
     template <bool White>
     _Compiletime void makeMove(const Move &move);
     template <bool White>
+    _Compiletime void makeMoveset(std::vector<Move> &moveset);
+    template <bool White>
     _Compiletime void undoMove(const Move &move);
     template <bool White>
+    _Compiletime void undoMoveset(std::vector<Move> &moveset);
+    template <bool White>
+
     _Compiletime void generateMoves(std::vector<Move> &moves, U16 timeline);
     template <bool isWhite>
+
     _Compiletime std::string moveToPGN(Move move);
     template <bool White>
-    _Compiletime Move PGNtoMove(std::smatch matches);
+    _Compiletime Move PGNtoMove(std::string PGN);
     _Compiletime void importPGN(std::string PGN);
     _Compiletime void importFen(std::string fen);
     _Compiletime void printToFile(std::ofstream &file);
@@ -75,7 +82,7 @@ namespace Chess5D
           os << "          ";
         for (int k = cur_min; k <= cur_max; ++k)
         {
-          std::string label = std::to_string(chess.origIndex[1] - j) + "," + std::to_string((k - 16) / 2);
+          std::string label = std::to_string(chess.origIndex[1] - j) + "," + std::to_string((k - 16) / 2)+((k%2)?"b":"w");
           os << "╔" + label + std::string("════════", 24 - 3 * label.length()) + "╗";
         }
         for (int k = cur_max + 1; k < i + 20; ++k)
@@ -125,7 +132,7 @@ namespace Chess5D
       return "Null";
     }
 
-    notation += "(" + std::to_string(move.sTimeline - origIndex[White]) + "T" + std::to_string((move.sTurn - 16) / 2) + ")";
+    notation += "(" + std::to_string(origIndex[White]-move.sTimeline) + "T" + std::to_string((move.sTurn - 16) / 2) + ")";
 
     Board<Set> &brd = boards[move.sTimeline][move.sTurn];
     notation += toupper(pieceToChar(brd.board.mailboxBoard[move.from]));
@@ -134,15 +141,18 @@ namespace Chess5D
 
     if (move.type >= Travel)
     {
-      notation += ">>(" + std::to_string(move.eTimeline - origIndex[White]) + "T" + std::to_string((move.eTurn - 16) / 2) + ")";
+      notation += ">>(" + std::to_string(origIndex[White]-move.eTimeline ) + "T" + std::to_string((move.eTurn - 16) / 2) + ")";
 
       Board<Set> &brdTo = boards[move.eTimeline][move.eTurn];
     }
 
+    //Causing incorrect reads
+    /*
     if (move.type == Capture || move.type == Enpassant || move.type == PromoCapture || move.type == TravelCapture || move.type == TravelPromoCapture)
     {
       notation += "x";
     }
+    */
 
     notation += sqToString[move.to];
 
@@ -153,6 +163,7 @@ namespace Chess5D
     return notation;
   }
 
+  //Updates the past masks
   template <U8 Set, bool White>
   _Compiletime void refreshMask(Board<Set> *brd)
   {
@@ -160,20 +171,21 @@ namespace Chess5D
     const U64 notOcc = ~(brd - 1)->board.occ;
     brd->pastMask.center = ((notOcc & (brd - 2)->pastMask.center) | royalty);
     brd->pastMask.north = ((notOcc & (brd - 2)->pastMask.north) | royalty) << 8;
-    brd->pastMask.east = ((notOcc & (brd - 2)->pastMask.east & Not<East>()) | royalty) << 1;
+    brd->pastMask.east = (((notOcc & (brd - 2)->pastMask.east) | royalty) & Not<East>()) << 1;
     brd->pastMask.south = ((notOcc & (brd - 2)->pastMask.south) | royalty) >> 8;
-    brd->pastMask.west = ((notOcc & (brd - 2)->pastMask.west & Not<West>()) | royalty) >> 1;
-    brd->pastMask.northeast = ((notOcc & (brd - 2)->pastMask.northeast & Not<East>()) | royalty) << 9;
-    brd->pastMask.southeast = ((notOcc & (brd - 2)->pastMask.southeast & Not<East>()) | royalty) >> 7;
-    brd->pastMask.southwest = ((notOcc & (brd - 2)->pastMask.southwest & Not<West>()) | royalty) >> 9;
-    brd->pastMask.northwest = ((notOcc & (brd - 2)->pastMask.northwest & Not<West>()) | royalty) << 7;
+    brd->pastMask.west = (((notOcc & (brd - 2)->pastMask.west) | royalty) & Not<West>()) >> 1;
+    brd->pastMask.northeast = (((notOcc & (brd - 2)->pastMask.northeast) | royalty) & Not<East>())<< 9;
+    brd->pastMask.southeast = (((notOcc & (brd - 2)->pastMask.southeast) | royalty) & Not<East>()) >> 7;
+    brd->pastMask.southwest = (((notOcc & (brd - 2)->pastMask.southwest) | royalty) & Not<West>()) >> 9;
+    brd->pastMask.northwest = (((notOcc & (brd - 2)->pastMask.northwest) | royalty) & Not<West>()) << 7;
   }
-
+  
+  //Checks to see if you are currently in pastCheck
   template <U8 Set, U16 T, bool White>
   _Compiletime void createMask(Board<Set> *brd)  
   {
-    constexpr U512 notE = {Not<East>(), Not<East>(), Not<East>(), 0, Not<East>(), Not<East>(), Not<East>(), 0};
-    constexpr U512 notW = {Not<West>(), Not<West>(), Not<West>(), 0, Not<West>(), Not<West>(), Not<West>(), 0};
+    constexpr U512 notE = {(long long int) Not<East>(), (long long int) Not<East>(), (long long int) Not<East>(), 0, (long long int) Not<East>(), (long long int) Not<East>(), (long long int) Not<East>(), 0};
+    constexpr U512 notW = {(long long int) Not<West>(), (long long int) Not<West>(), (long long int) Not<West>(), 0, (long long int) Not<West>(), (long long int) Not<West>(), (long long int) Not<West>(), 0};
 
     const U64 rook = brd->rooks(!White, true);
     const U64 bishop = brd->bishops(!White, true);
@@ -183,7 +195,7 @@ namespace Chess5D
     const U512 center = U512Set(0, bishop, rook, bishop, rook, bishop, rook, bishop);
     const U512 orth = U512Set(0, unicorn, bishop, unicorn, bishop, unicorn, bishop, unicorn);
     const U512 diag = U512Set(0, dragon, unicorn, dragon, unicorn, dragon, unicorn, dragon);
-
+    
     U512 o[6];
     U512 r[7];
     for (int i = 0; i < 6; ++i)
@@ -201,15 +213,15 @@ namespace Chess5D
 
     for (int i = 5; i >= 0; i--)
     {
-      maskC = (o[i] & maskC) | r[i]; // TODO: technically not correct
+      maskC = (o[i] & maskC) | r[i]; // TODO: technically not correct because it doesnt go back far enough?
       maskN = ((o[i] & maskN) | r[i]) << 8;
       maskE = (((o[i] & maskE) | r[i]) & notE) << 1;
       maskS = ((o[i] & maskS) | r[i]) >> 8;
-      maskW = (((o[i] & maskW) | r[i])& notW) >> 1;
-      maskNE = (((o[i] & maskNE ) | r[i])& notE) << 9;
-      maskSE = (((o[i] & maskSE ) | r[i])& notE) >> 7;
-      maskSW = (((o[i] & maskSW ) | r[i])& notW) >> 9;
-      maskNW = (((o[i] & maskNW ) | r[i])& notW) << 7;
+      maskW = (((o[i] & maskW) | r[i]) & notW) >> 1;
+      maskNE = (((o[i] & maskNE ) | r[i]) & notE) << 9;
+      maskSE = (((o[i] & maskSE ) | r[i]) & notE) >> 7;
+      maskSW = (((o[i] & maskSW ) | r[i]) & notW) >> 9;
+      maskNW = (((o[i] & maskNW ) | r[i]) & notW) << 7;
     }
 
     //Assumes all boards are loaded correctly
@@ -255,6 +267,7 @@ namespace Chess5D
     brd->pastCheck = maskSlider | maskKnight | maskKing | maskPawn | maskBrawn;
   }
 
+  //Generates crosstimeline past masks
   template <U8 Set, U16 L, U16 T, bool White>
   _Compiletime TMask travelMasks(Board<Set> (&boards)[L + 16][T + 32], U8 timeline, U8 turn)
   {
@@ -291,7 +304,7 @@ namespace Chess5D
           brds[6].checkMask,
           0);
 
-      // TODO: these two can maybe be combined without assigning them and entered into m[i]
+      // TODO: these two (c and em) can maybe be combined without assigning them and entered into m[i]
       const U512 em = U512Set(
           brds[0].bitBoard(White, NoType),
           brds[1].bitBoard(White, NoType),
@@ -488,7 +501,7 @@ namespace Chess5D
   {
     // Get the board and set up checkMasks, pinMasks, and banMask
     TimelineInfo info = timelineInfo[timeline];
-    Board<Set> &brd = boards[timeline][info.turn]; // eventually needs to be done for every timeline or specify timeline in input
+    Board<Set> &brd = boards[timeline][info.turn];
 
     if(brd.pastCheck==FULL) createMask<Set, T, White>(&brd); //Past Checks Generate if not done already
 
@@ -551,14 +564,17 @@ namespace Chess5D
     case Castle:
       brd.template makeMove<White, Castle>(move);
       break;
+    case NullMove:
+      break;
     }
     // travel cases
     if (move.type >= Travel)
     {
       int newTimeline;
       // increment timelineNum//active/otherstuff
-      if (timelineInfo[move.eTimeline].turn == move.eTurn)
-      { // Checks if its a jump
+      bool jump = timelineInfo[move.eTimeline].turn == move.eTurn;
+      if (jump)
+      {
         newTimeline = move.eTimeline;
         ++timelineInfo[newTimeline].turn;
       }
@@ -605,16 +621,31 @@ namespace Chess5D
       {
         brdTravel.template makeMoveTravel<White, false>(move, piece);
       }
-
       brdTravel.template refresh<!White>(timelineInfo[newTimeline]);
-      refreshMask<Set, !White>(&brdTravel);
+
+      Board<Set> &brdTravelNext = boards[newTimeline][move.eTurn + 2];
+      refreshMask<Set, White>(&brdTravelNext); //If not a travel just keep all masks to empty? Cant be in pastCheck if there is no past. Unless its a jump then this is still valid
     }
     ++timelineInfo[move.sTimeline].turn;
 
     brd.template refresh<!White>(timelineInfo[move.sTimeline]);
-    refreshMask<Set, !White>(&brd);
+
+    Board<Set> &brdNext = boards[move.sTimeline][move.sTurn + 2];
+    refreshMask<Set, White>(&brdNext);
+  }
+
+    template <U8 Set, U8 Size, U16 L, U16 T>
+  template <bool White>
+  _Compiletime void Chess<Set, Size, L, T>::makeMoveset(std::vector<Move> &moveset)
+  {
+    for (Move &move : moveset)
+    {
+      makeMove<White>(move);
+    }
+    actionNum++;
 
     //Update Present TODO: Currently does calculation multiple times over
+    present = timelineInfo[origIndex[1]].turn; // set to random timeline's turn to initialize
     for (int i = origIndex[1] - activeNum[1]; i <= origIndex[0] + activeNum[0]; ++i)
     {
       U8 turn = timelineInfo[i].turn;
@@ -629,10 +660,12 @@ namespace Chess5D
     Board<Set> &brd = boards[move.sTimeline][move.sTurn + 1];
     brd.board.occ = FULL;
     brd.checkMask = EMPTY;
+    brd.banMask = EMPTY;
     if (Set > WKing)
       brd.template bitBoard<White, King>() = EMPTY;
     if (Set > WRQueen)
       brd.template bitBoard<White, RQueen>() = EMPTY;
+
     --timelineInfo[move.sTimeline].turn;
 
     if (move.type >= Travel)
@@ -668,42 +701,63 @@ namespace Chess5D
       if (Set > WRQueen)
         brdTo.template bitBoard<White, RQueen>() = EMPTY;
 
-      // TODO: cleanup
-      brdTo.pastMask.center = EMPTY;
-      brdTo.pastMask.north = EMPTY;
-      brdTo.pastMask.east = EMPTY;
-      brdTo.pastMask.south = EMPTY;
-      brdTo.pastMask.west = EMPTY;
-      brdTo.pastMask.northeast = EMPTY;
-      brdTo.pastMask.southeast = EMPTY;
-      brdTo.pastMask.southwest = EMPTY;
-      brdTo.pastMask.northwest = EMPTY;
+      // TODO: cleanup maybe this should be an array to loop through
+      Board<Set> &brdToNext = boards[eTimelineReal][move.eTurn + 2];
+      brdToNext.pastMask.center = EMPTY;
+      brdToNext.pastMask.north = EMPTY;
+      brdToNext.pastMask.east = EMPTY;
+      brdToNext.pastMask.south = EMPTY;
+      brdToNext.pastMask.west = EMPTY;
+      brdToNext.pastMask.northeast = EMPTY;
+      brdToNext.pastMask.southeast = EMPTY;
+      brdToNext.pastMask.southwest = EMPTY;
+      brdToNext.pastMask.northwest = EMPTY;
+      brdToNext.pastCheck=FULL;
       brdTo.pastCheck=FULL;
+      brd.template refresh<!White>(timelineInfo[move.eTimeline]);
     }
 
-    brd.pastMask.center = EMPTY;
-    brd.pastMask.north = EMPTY;
-    brd.pastMask.east = EMPTY;
-    brd.pastMask.south = EMPTY;
-    brd.pastMask.west = EMPTY;
-    brd.pastMask.northeast = EMPTY;
-    brd.pastMask.southeast = EMPTY;
-    brd.pastMask.southwest = EMPTY;
-    brd.pastMask.northwest = EMPTY;
+    Board<Set> &brdNext = boards[move.sTimeline][move.sTurn + 2];
+    brdNext.pastMask.center = EMPTY;
+    brdNext.pastMask.north = EMPTY;
+    brdNext.pastMask.east = EMPTY;
+    brdNext.pastMask.south = EMPTY;
+    brdNext.pastMask.west = EMPTY;
+    brdNext.pastMask.northeast = EMPTY;
+    brdNext.pastMask.southeast = EMPTY;
+    brdNext.pastMask.southwest = EMPTY;
+    brdNext.pastMask.northwest = EMPTY;
+    brdNext.pastCheck=FULL;
     brd.pastCheck=FULL;
 
-    //Update Present TODO: Currently does calculation multiple times over
+    brd.template refresh<White>(timelineInfo[move.sTimeline]); //TODO: This line is necessary to update pinmasks after an undo because its not info saved per board. This should maybe be changed
+  }  
+
+    template <U8 Set, U8 Size, U16 L, U16 T>
+  template <bool White>
+  _Compiletime void Chess<Set, Size, L, T>::undoMoveset(std::vector<Move> &moveset)
+  { 
+    for (int i = moveset.size() - 1; i >= 0; --i){
+      undoMove<White>(moveset[i]);
+    }
+    actionNum--;
+    
+    //TODO: Could possibly be updated efficiently by checking to see if a travel is made
+    present = timelineInfo[origIndex[1]].turn;
     for (int i = origIndex[1] - activeNum[1]; i <= origIndex[0] + activeNum[0]; ++i)
     {
       U8 turn = timelineInfo[i].turn;
       if (turn < present) present = turn;
     }
-  }  
+  }
 
   template <U8 Set, U8 Size, U16 L, U16 T>
   template <bool isWhite>
-  _Compiletime Move Chess<Set, Size, L, T>::PGNtoMove(std::smatch matches)
+  _Compiletime Move Chess<Set, Size, L, T>::PGNtoMove(std::string PGN)
   {
+    const std::regex movePat("(?:\\((-?\\d+)T(\\d+)\\))?([KQRBNPUDSWCY])?(([a-h])?([1-8])?)?x?([a-h][1-8])(([>][>]|[>])\\((-?\\d+)T(\\d+)\\)x?([a-h][1-8]))?(?:=([KQRBNPUDSWCY]))?");
+    std::smatch matches;
+    std::regex_search(PGN, matches, movePat);
 
     Move move;
     int score = 0;
@@ -718,6 +772,13 @@ namespace Chess5D
       move.sTurn = timelineInfo[move.sTimeline].turn;
     }
 
+    PieceType piece = Pawn; //TODO: Not reading correctly for (0T1) d4
+    if(matches[3].matched){ 
+      piece=charToPieceType(matches[3].str()[0]);
+    }
+
+    Board startBoard = boards[move.sTimeline][move.sTurn];
+
     if (matches[8].matched)
     {
       move.type = Travel;
@@ -727,15 +788,16 @@ namespace Chess5D
       move.from = (Size * (matches[7].str()[1] - '1')) + (matches[7].str()[0] - 'a');
       move.to = (Size * (matches[12].str()[1] - '1')) + (matches[12].str()[0] - 'a');
       U64 lastRank = 0xffull | 0xffull << (8 * Size - 8); // could be issues with having both last ranks
-      if ((!matches[3].matched || matches[3].str() == "P" || matches[3].str() == "W") && (lastRank & (1ULL << move.to)))
+
+      Board endBoard = boards[move.eTimeline][move.eTurn];
+      if ((piece == Pawn ||  piece == Brawn) && (lastRank & (1ULL << move.to)))
       {
         move.special1 = charToPiece(matches[13].str()[0] + (isWhite ? 0 : 32));
-        // charToPiece<isWhite>(matches[13].str()[0]);
-        move.type = (boards[move.eTimeline][move.eTurn].board.mailboxBoard[move.to] != NoPiece) ? TravelPromoCapture : TravelPromotion;
+        move.type = (endBoard.board.mailboxBoard[move.to] != NoPiece) ? TravelPromoCapture : TravelPromotion;
       }
       else
       {
-        move.type = (boards[move.eTimeline][move.eTurn].board.mailboxBoard[move.to] != NoPiece) ? TravelCapture : Travel;
+        move.type = (endBoard.board.mailboxBoard[move.to] != NoPiece) ? TravelCapture : Travel;
       }
     }
     else
@@ -743,31 +805,72 @@ namespace Chess5D
       move.type = Normal;
       move.eTimeline = move.sTimeline;
       move.eTurn = move.sTurn;
-      move.from = (Size * (matches[6].str()[0] - '1')) + (matches[5].str()[0] - 'a');
+
       move.to = (Size * (matches[7].str()[1] - '1')) + (matches[7].str()[0] - 'a');
+
+      if(matches[5].matched&&matches[6].matched){
+        move.from=(matches[5].str()[0] - 'a') + (Size * (matches[6].str()[0] - '1'));
+      }
+      else // **Disambiguation**
+      {
+        U64 possiblePieces = startBoard.bitBoard(isWhite, piece);
+
+        U64 fileMask = FULL;
+        U64 rankMask = FULL;
+        if(piece== Pawn || piece== Brawn){
+          U64 rankMask=RANKMASK[move.to/Size - (isWhite ? 1 : -1)];
+          U64 rankMask2=RANKMASK[move.to/Size - (isWhite ? 2 : -2)];
+          U64 fileMask=FILEMASK[move.to%Size];
+          possiblePieces|=startBoard.board.epTarget;
+          if(matches[5].matched)
+          { 
+            fileMask=FILEMASK[matches[5].str()[0] - 'a'];
+          }
+
+          U64 sq1=possiblePieces&fileMask&rankMask;
+          U64 sq2=possiblePieces&fileMask&rankMask2;
+
+          move.from = sq1 ?SquareOf(sq1) : SquareOf(sq2);
+        }
+        else{
+          if(matches[5].matched)
+          {
+            fileMask=FILEMASK[matches[5].str()[0] - 'a'];
+          }
+          if(matches[6].matched){
+            rankMask=RANKMASK[matches[6].str()[0] - '1'];
+          }
+
+          U64 mask=
+            piece == Knight   ? Lookup::KnightAttacks[move.to]
+          : piece == Bishop   ? Lookup::BishopAttacks[move.to][startBoard.board.occ]
+          : piece == Rook     ? Lookup::RookAttacks[move.to][startBoard.board.occ]
+          : piece == King ? Lookup::KingAttacks[move.to] | (Lookup::RookAttacks[move.to][startBoard.board.occ] & RANKMASK[move.to/Size] & Lookup::Rings[move.to][1]) //Jank way to check for castle but... -\_(0.0)_/-
+          : piece == CKing ? Lookup::KingAttacks[move.to]
+          : (piece == Princess || piece == Queen|| piece == RQueen) ? Lookup::BishopAttacks[move.to][startBoard.board.occ] | Lookup::RookAttacks[move.to][startBoard.board.occ]
+                                      : 0x0000000000000000; 
+
+          move.from = SquareOf(mask&possiblePieces&fileMask&rankMask);
+        }
+      }
+      
       // Castle Check
-      if ((matches[3].str() == "K" && abs(move.to - move.from) == 2))
+      if ((piece == King && abs(move.to - move.from) == 2))
       {
         int i = move.to;
-        while (boards[move.eTimeline][move.eTurn].board.mailboxBoard[i] != toPiece(isWhite, Rook) && i < Size * ((move.to / Size) + 1) - 1 && i > Size * (move.to / Size))
+        while (startBoard.board.mailboxBoard[i] != toPiece(isWhite, Rook) && i < Size * ((move.to / Size) + 1) - 1 && i > Size * (move.to / Size))
         {
-          if (move.to - move.from > 0)
-          {
-            i++;
-          }
-          else
-          {
-            i--;
-          }
+          if (move.to - move.from > 0){i++;}
+          else{i--;}
         }
         move.special1 = i;
         move.special2 = move.from + ((int)move.to - (int)move.from) / 2;
         move.type = Castle;
       }
-      else if (!matches[3].matched || matches[3].str() == "P" || matches[3].str() == "W")
+      else if (piece == Pawn ||  piece == Brawn)
       {                                                     // En Passant/Pawn Push/
         U64 lastRank = 0xffull | 0xffull << (8 * Size - 8); // could be issues with having both last ranks
-        if (pawnShift<isWhite, North>(boards[move.eTimeline][move.eTurn].board.epTarget) & (1ULL << move.to))
+        if (pawnShift<isWhite, North>(startBoard.board.epTarget) & (1ULL << move.to))
         { // directions could be off need to test
           move.special1 = pawnSquare<!isWhite, North>(move.to);
           move.type = Enpassant;
@@ -775,12 +878,11 @@ namespace Chess5D
         else if (lastRank & (1ULL << move.to))
         {
           move.special1 = charToPiece(matches[13].str()[0] + (isWhite ? 0 : 32));
-          // charToPiece<isWhite>(matches[13].str()[0]);
-          move.type = (boards[move.eTimeline][move.eTurn].board.mailboxBoard[move.to] != NoPiece) ? PromoCapture : Promotion;
+          move.type = (startBoard.board.mailboxBoard[move.to] != NoPiece) ? PromoCapture : Promotion;
         }
         else
         {
-          if (boards[move.eTimeline][move.eTurn].board.mailboxBoard[move.to] != NoPiece)
+          if (startBoard.board.mailboxBoard[move.to] != NoPiece)
           {
             move.type = Capture;
           }
@@ -790,7 +892,7 @@ namespace Chess5D
           }
         }
       }
-      else if (boards[move.eTimeline][move.eTurn].board.mailboxBoard[move.to] != NoPiece)
+      else if (startBoard.board.mailboxBoard[move.to] != NoPiece)
       {
         move.type = Capture;
       }
@@ -806,19 +908,20 @@ namespace Chess5D
   _Compiletime void Chess<Set, Size, L, T>::importPGN(std::string PGN)
   {
     const std::regex turnPat("(?:\\d+\\.\\s*)(?:\\{[^\\}]*\\}\\s*)?([^\\/]*[^\\/\\s])(?:\\s*[\\/]\\s*)*(?:\\{[^\\}]*\\}\\s*)?(.*[^\\s]|)");
-    const std::regex movePat("(?:\\((-?\\d+)T(\\d+)\\))?([KQRBNPUDSWCY])?(([a-h])?([1-8])?)?x?([a-h][1-8])(([>][>]|[>])\\((-?\\d+)T(\\d+)\\)x?([a-h][1-8]))?(?:=([KQRBNPUDSWCY]))?");
+    //(?:\((-?\d+)T(\d+)\)\s*)?([KQRBNPUDSWCY])?(([a-h])?([1-8])?)?x?([a-h][1-8])(([>][>]|[>])\((-?\d+)T(\d+)\)x?([a-h][1-8]))?(?:=([KQRBNPUDSWCY]))?
+    const std::regex movePat("(?:\\((-?\\d+)T(\\d+)\\)\\s?)?([KQRBNPUDSWCY])?(([a-h])?([1-8])?)?x?([a-h][1-8])(([>][>]|[>])\\((-?\\d+)T(\\d+)\\)x?([a-h][1-8]))?(?:=([KQRBNPUDSWCY]))?");
     for (auto i = std::sregex_iterator(PGN.begin(), PGN.end(), turnPat); i != std::sregex_iterator(); ++i)
     {
       const std::string &white = (*i)[1].str();
       for (auto j = std::sregex_iterator(white.begin(), white.end(), movePat); j != std::sregex_iterator(); ++j)
       {
-        makeMove<true>(PGNtoMove<true>(*j));
+        makeMove<true>(PGNtoMove<true>((*j)[0].str()));
       }
 
       const std::string black = (*i)[2].str();
       for (auto j = std::sregex_iterator(black.begin(), black.end(), movePat); j != std::sregex_iterator(); ++j)
       {
-        makeMove<false>(PGNtoMove<false>(*j));
+        makeMove<false>(PGNtoMove<false>((*j)[0].str()));
       }
     }
   }
@@ -842,6 +945,7 @@ namespace Chess5D
         timelineNum[0] = brdL - origIndex[0];
 
       Board<Set> &brd = boards[brdL][brdT];
+      Board<Set> &brdNext = boards[brdL][brdT+1];
       for (U8 i = 0; i < Size; ++i)
       {
         const std::string &row = board[i + 1].str();
@@ -876,12 +980,12 @@ namespace Chess5D
       if (white)
       {
         brd.template refresh<true>(info); // refresh
-        refreshMask<Set, true>(&brd);
+        refreshMask<Set, false>(&brdNext);
       }
       else
       {
         brd.template refresh<false>(info);
-        refreshMask<Set, false>(&brd);
+        refreshMask<Set, true>(&brdNext);
       }
     }
     activeNum[1] = std::min((int)timelineNum[1], timelineNum[0] + 1);
