@@ -2,46 +2,6 @@
 #include "ai.hpp"
 #include "positions.hpp"
 
-template <U8 Set, U8 Size, U16 L, U16 T, bool White>
-void backtrace(Chess<Set, Size, L, T> &chess, int timeline, int depth)
-{
-    TimelineInfo info = chess.timelineInfo[timeline];
-    Board<Set> &brd = chess.boards[timeline][info.turn];
-
-    U64 key = tt.computeHashKey<Set, White>(brd);
-    TTEntry &ttEntry = tt.probe(key);
-
-    if (ttEntry.key == key)
-    {
-        if(ttEntry.isQSearch) std::cout << "invalid\n";
-        Move move = ttEntry.move;
-        if (!White)
-        {
-            if (depth == 0)
-            {
-                std::cout << "1. ... ";
-            }
-            std::cout << "/" << chess.template moveToPGN<false>(move) << " {" << move.score << "}" << std::endl;
-        }
-        else
-        {
-            std::cout << depth / 2 + 1 + (depth) % 2 << ". " << chess.template moveToPGN<true>(move) << " {" << move.score << "}";
-        }
-
-        chess.template makeMove<White>(move);
-        if (move.type >= Travel)
-        {
-            U8 newTimeline = chess.origIndex[White] + (White ? -1 : 1) * (chess.timelineNum[White]);
-            backtrace<Set, Size, L, T, !White>(chess, newTimeline, depth + 1);
-        }
-        else
-        {
-            backtrace<Set, Size, L, T, !White>(chess, timeline, depth + 1);
-        }
-        chess.template undoMove<White>(move);
-    }
-    return;
-}
 template <U8 Set, U8 Size, U16 L, U16 T>
 void playChess()
 {
@@ -83,7 +43,7 @@ void playChess()
                     break;
                 pgn += line + "\n";
             }
-            chess.importPGN(pgn);
+            chess.importPGN(pgn); //TODO: should really be able to handle multiple lines. AKA dont need to say 1. Nb5d6 can just say Nb5d6
             std::cout << chess << std::endl;
         }
         else if (option == "engine")
@@ -100,50 +60,43 @@ void playChess()
             std::getline(std::cin, color);
             bool isBlack = (color == "b");
 
+            int timeline = chess.origIndex[!isBlack];
             count = 0;
             hitCount = 0;
             collision = 0;
             auto begin = std::chrono::high_resolution_clock::now();
-            // Chess5D::Result res = isBlack ? negaMax<Set, Size, L, T, false>(chess, -CHECKMATE, CHECKMATE, depth, std::vector<Chess5D::Move>()) : negaMax<Set, Size, L, T, true>(chess, -CHECKMATE, CHECKMATE, depth, std::vector<Chess5D::Move>());
-            Chess5D::Result res = isBlack ? negaMaxIDDFS<Set, Size, L, T, false>(chess, depth, std::chrono::milliseconds(20000)) : negaMaxIDDFS<Set, Size, L, T, true>(chess, depth, std::chrono::milliseconds(20000));
+            int timeGiven = 20000;
+            int maxSimuls = 1000;
+            //std::unique_ptr<Chess5D::Result> res = isBlack ? negaMaxIDDFS<Set, Size, L, T, false>(chess, depth, std::chrono::milliseconds(timeGiven)) : negaMaxIDDFS<Set, Size, L, T, true>(chess, depth, std::chrono::milliseconds(timeGiven));
+            std::unique_ptr<Chess5D::Result> res = isBlack ? MCTS<Set, Size, L, T, false>(chess, maxSimuls, depth) : MCTS<Set, Size, L, T, true>(chess, maxSimuls, depth);
+            //std::unique_ptr<Result> res = isBlack ? negaMax1<Set, Size, L, T, false, true, NodeTravel>(chess, -CHECKMATE, CHECKMATE, depth, 0, timeline, Chess5D::Move(0, 0, 0, 0, Chess5D::NullMove, 0, 0, 0, 0)) : negaMax1<Set, Size, L, T, true, true, NodeTravel>(chess, -CHECKMATE, CHECKMATE, depth, 0, timeline, Chess5D::Move(0, 0, 0, 0, Chess5D::NullMove, 0, 0, 0, 0));;
+            //std::unique_ptr<Result> res = isBlack ? qSearch<Set, Size, L, T, false>(chess, -CHECKMATE, CHECKMATE, 0, chess.origIndex[0], Chess5D::Move(0,0,0,0,Chess5D::NullMove,0,0,0,0)) : qSearch<Set, Size, L, T, true>(chess, -CHECKMATE, CHECKMATE, 0, chess.origIndex[0], Chess5D::Move(0,0,0,0,Chess5D::NullMove,0,0,0,0));
+            
             auto end = std::chrono::high_resolution_clock::now();
             std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000000.0 << " s\n";
+            std::cout << "Max Depth: " << maxPlyReached << std::endl;
             std::cout << "Positions: " << count << std::endl;
+            std::cout << "QPositions: " << qCount << std::endl;
+            std::cout << "NMH: " << NMHcut << std::endl;
             std::cout << "Hits: " << hitCount << std::endl;
             std::cout << "Collision: " << collision << std::endl;
             std::cout << chess << std::endl;
-
-            std::cout << res.value << std::endl;
-
-            int timeline = chess.origIndex[!isBlack];
-
-            isBlack ? backtrace<Set, Size, L, T, false>(chess, timeline, 0) : backtrace<Set, Size, L, T, true>(chess, timeline, 0);
+            
+            Chess5D::TimelineInfo info = chess.timelineInfo[timeline];
+            Chess5D::Board<Set> &brd1 = chess.boards[timeline][info.turn];
+            Chess5D::Board<Set> &brd2 = chess.boards[timeline][info.turn-1];
+            //printMasks<Set>(brd1);
+            //printMasks<Set>(brd2);
             /*
-            std::cout << "Regular "<< std::endl;
-            int i = 0;
-            const Chess5D::Result *resPtr = &res;
-            while (resPtr != nullptr)
-            {
-                for (const auto &move : resPtr->moveset)
-                {
-                    if (isBlack)
-                    {
-                        if (i == 0)
-                        {
-                            std::cout << "1. ... ";
-                        }
-                        std::cout << "/" << chess.template moveToPGN<false>(move) << " {" << move.score << "}" << std::endl;
-                    }
-                    else
-                    {
-                        std::cout << i / 2 + 1 + (i) % 2 << ". " << chess.template moveToPGN<true>(move) << " {" << move.score << "}";
-                    }
-                    isBlack = !isBlack;
-                }
-                resPtr = resPtr->next.get();
-                i++;
+            for (int i=info.tailIndex; i<=info.turn; ++i) {
+                std::cout << "Turn " << i-info.tailIndex << std::endl;
+                Chess5D::Board<Set> &brd = chess.boards[timeline][i];
+                printMasks<Set>(brd);
             }
             */
+            std::cout <<"Score: " <<res->value << std::endl;
+
+            isBlack ? backtrace<Set, Size, L, T, false>(chess, 0, res) : backtrace<Set, Size, L, T, true>(chess, 0, res);
 
             std::cout << std::endl;
         }
@@ -161,9 +114,10 @@ void playChess()
 
             while (true)
             {
-                Chess5D::Result res = isBlack ? negaMaxIDDFS<Set, Size, L, T, false>(chess, depth, std::chrono::milliseconds(10000)) : negaMaxIDDFS<Set, Size, L, T, true>(chess, depth, std::chrono::milliseconds(10000));
-                isBlack ? chess.template makeMove<false>(res.moveset[0]) : chess.template makeMove<true>(res.moveset[0]);
-                std::cout << res.value << std::endl;
+                std::unique_ptr<Chess5D::Result> res = isBlack ? negaMaxIDDFS<Set, Size, L, T, false>(chess, depth, std::chrono::milliseconds(10000)) : negaMaxIDDFS<Set, Size, L, T, true>(chess, depth, std::chrono::milliseconds(10000));
+                std::cout << "Here" << std::endl;
+                isBlack ? chess.template makeMove<false>(res->moveset[0]) : chess.template makeMove<true>(res->moveset[0]); //Result needs to change
+                std::cout << res->value << std::endl;
                 std::cout << chess << std::endl;
                 isBlack = !isBlack;
 
@@ -183,9 +137,63 @@ void playChess()
             std::getline(std::cin, color);
             bool isBlack = (color == "b");
 
-            std::cout << (isBlack ? evaluate<Set, Size, L, T, false>(chess, chess.origIndex[0],0) : evaluate<Set, Size, L, T, true>(chess, chess.origIndex[0],0)) << std::endl;
+            int timeline = chess.origIndex[0];
+            TimelineInfo &info = chess.timelineInfo[timeline];
+            Board<Set> &brd = chess.boards[timeline][info.turn];
+            std::vector<Move> moves;
+            moves.reserve(100);
+            std::cout<<"waybefore"<<std::endl;
+            for (int i = 0; i < 64; i++) {
+                std::cout << "pinMasks[" << i << "]" << info.pinMasks[i] << "\n";
+                std::cout << "checkMasks[" << i << "]" << info.checkMasks[i] << "\n";
+            }
+            if (isBlack) {
+                chess.template generateMoves<false>(moves, timeline);
+            } else {
+                chess.template generateMoves<true>(moves, timeline);
+            }
+
+            TimelineInfo infoBefore = info;
+            Board<Set> brdBefore = brd;
+            std::cout<<"before"<<std::endl;
+            for (int i = 0; i < 64; i++) {
+                std::cout << "pinMasks[" << i << "]" << info.pinMasks[i] << "\n";
+                std::cout << "checkMasks[" << i << "]" << info.checkMasks[i] << "\n";
+            }
+
+            if (isBlack) {
+                chess.template makeMove<false>(moves[0]);
+                chess.template undoMove<false>(moves[0]);
+            } else {
+                chess.template makeMove<true>(moves[0]);
+                chess.template undoMove<true>(moves[0]);
+            }
+            std::cout<<"afteer"<<std::endl;
+            for (int i = 0; i < 64; i++) {
+                std::cout << "pinMasks[" << i << "]" << info.pinMasks[i] << "\n";
+                std::cout << "checkMasks[" << i << "]" << info.checkMasks[i] << "\n";
+            }
+            debugCompare(infoBefore, info);
+            debugCompareBoard<Set>(brdBefore, brd);
+
+            //std::cout << "Eval: "<<(isBlack ? evaluate<Set, Size, L, T, false>(chess, chess.origIndex[0],0) : evaluate<Set, Size, L, T, true>(chess, chess.origIndex[0],0)) << std::endl;
         }
-        else if (option == "exit")
+        else if (option == "moves")
+        {   
+            std::cout << "Enter Color(w/b): ";
+            std::string color;
+            std::getline(std::cin, color);
+            bool isBlack = (color == "b");
+
+            std::vector<Move> moves;
+            moves.reserve(100);
+            isBlack ? chess.template generateMoves<false>(moves, chess.origIndex[0]): chess.template generateMoves<true>(moves, chess.origIndex[0]);
+            
+            for (int i = 0; i < moves.size(); ++i){
+              std::cout << (isBlack ? chess.template moveToPGN<false>(moves[i]) : chess.template moveToPGN<true>(moves[i]))  << std::endl;  
+            }
+        }
+        else if (option == "exit" || option == "q")
         {
             break;
         }
@@ -210,6 +218,7 @@ int main()
     constexpr U16 T = 128;
 
     constexpr bool White = true;
+
     /*
     Chess5D::Chess<Set, Size, L, T> chess{};
     Positions::load(chess, 7);

@@ -10,8 +10,8 @@ namespace Chess5D
   {
     U8 from = 0;
     U8 to = 0;
-    U8 special1 = 0;
-    U8 special2 = 0;
+    U8 special1 = 0; //Rook from square for castle, piece type for promotion
+    U8 special2 = 0; //Rook to square for castle
 
     U8 sTimeline = 0;
     U8 sTurn = 0;
@@ -55,6 +55,35 @@ namespace Chess5D
     U64 pinMasks[64]{};
     U64 checkMasks[64]{};
   };
+
+
+inline void debugCompare(const TimelineInfo& before, const TimelineInfo& after) {
+    if (before.timeline != after.timeline)
+        std::cerr << "timeline mismatch: " << (int)after.timeline << " vs " << (int)before.timeline << "\n";
+    if (before.turn != after.turn)
+        std::cerr << "turn mismatch: " << (int)after.turn << " vs " << (int)before.turn << "\n";
+    if (before.tailIndex != after.tailIndex)
+        std::cerr << "tailIndex mismatch: " << (int)after.tailIndex << " vs " << (int)before.tailIndex << "\n";
+
+    if (before.pinHV != after.pinHV)
+        std::cerr << "pinHV mismatch: " << after.pinHV << " vs " << before.pinHV << "\n";
+    if (before.pinD12 != after.pinD12)
+        std::cerr << "pinD12 mismatch: " << after.pinD12 << " vs " << before.pinD12 << "\n";
+    if (before.doublePin != after.doublePin)
+        std::cerr << "doublePin mismatch: " << after.doublePin << " vs " << before.doublePin << "\n";
+
+    for (int i = 0; i < 64; i++) {
+        if (before.pinMasks[i] != after.pinMasks[i])
+            std::cerr << "pinMasks[" << i << "] mismatch: " << after.pinMasks[i] << " vs " << before.pinMasks[i] << "\n";
+        if (after.pinMasks[i] && after.pinMasks[i]!=FULL)
+            std::cout << "pinMasks[" << i << "]" << after.pinMasks[i] << "\n";
+        if (after.checkMasks[i] && after.checkMasks[i]!=FULL)
+            std::cout << "checkMasks[" << i << "]" << after.checkMasks[i] << "\n";
+        if (before.checkMasks[i] != after.checkMasks[i])
+            std::cerr << "checkMasks[" << i << "] mismatch: " << after.checkMasks[i]
+                      << " vs " << before.checkMasks[i] << "\n";
+    }
+}
 
   template <U8 Set>
   struct Board
@@ -124,9 +153,77 @@ namespace Chess5D
     }
   };
 
+template <U8 Set>
+inline void debugCompareBoard(const Board<Set>& before, const Board<Set>& after) {
+    // mailboxBoard
+    for (int i = 0; i < 64; i++) {
+        if (before.board.mailboxBoard[i] != after.board.mailboxBoard[i]) {
+            std::cerr << "mailboxBoard[" << i << "] mismatch: "
+                      << (int)after.board.mailboxBoard[i] << " vs "
+                      << (int)before.board.mailboxBoard[i] << "\n";
+        }
+    }
+
+    // bitboards
+    for (int i = 0; i < Set; i++) {
+        if (before.board.bitBoard[i] != after.board.bitBoard[i]) {
+            std::cerr << "bitBoard[" << i << "] mismatch: "
+                      << std::hex << after.board.bitBoard[i] << " vs "
+                      << before.board.bitBoard[i] << std::dec << "\n";
+        }
+    }
+
+    if (before.board.occ != after.board.occ)
+        std::cerr << "occ mismatch: "
+                  << std::hex << after.board.occ << " vs " << before.board.occ << std::dec << "\n";
+    if (before.board.white != after.board.white)
+        std::cerr << "white mismatch: "
+                  << std::hex << after.board.white << " vs " << before.board.white << std::dec << "\n";
+    if (before.board.black != after.board.black)
+        std::cerr << "black mismatch: "
+                  << std::hex << after.board.black << " vs " << before.board.black << std::dec << "\n";
+    if (before.board.unmoved != after.board.unmoved)
+        std::cerr << "unmoved mismatch: "
+                  << std::hex << after.board.unmoved << " vs " << before.board.unmoved << std::dec << "\n";
+    if (before.board.epTarget != after.board.epTarget)
+        std::cerr << "epTarget mismatch: "
+                  << std::hex << after.board.epTarget << " vs " << before.board.epTarget << std::dec << "\n";
+
+    // pastMask
+    auto checkMask = [&](const char* name, U64 b, U64 a) {
+        if (b != a)
+            std::cerr << name << " mismatch: "
+                      << std::hex << a << " vs " << b << std::dec << "\n";
+    };
+
+    checkMask("north", before.pastMask.north, after.pastMask.north);
+    checkMask("east", before.pastMask.east, after.pastMask.east);
+    checkMask("south", before.pastMask.south, after.pastMask.south);
+    checkMask("west", before.pastMask.west, after.pastMask.west);
+    checkMask("northeast", before.pastMask.northeast, after.pastMask.northeast);
+    checkMask("southeast", before.pastMask.southeast, after.pastMask.southeast);
+    checkMask("southwest", before.pastMask.southwest, after.pastMask.southwest);
+    checkMask("northwest", before.pastMask.northwest, after.pastMask.northwest);
+    checkMask("center", before.pastMask.center, after.pastMask.center);
+
+    if (before.checkMask != after.checkMask)
+        std::cerr << "checkMask mismatch: "
+                  << std::hex << after.checkMask << " vs " << before.checkMask << std::dec << "\n";
+    if (before.pastCheck != after.pastCheck)
+        std::cerr << "pastCheck mismatch: "
+                  << std::hex << after.pastCheck << " vs " << before.pastCheck << std::dec << "\n";
+    if (before.banMask != after.banMask)
+        std::cerr << "banMask mismatch: "
+                  << std::hex << after.banMask << " vs " << before.banMask << std::dec << "\n";
+    if (before.traveled != after.traveled)
+        std::cerr << "traveled mismatch: "
+                  << after.traveled << " vs " << before.traveled << "\n";
+}
+
   template <U8 Set>
   void printMasks(Board<Set> &brd)
   {
+    /*
     std::cout << "north:      " << brd.pastMask.north << std::endl;
     std::cout << "east:       " << brd.pastMask.east << std::endl;
     std::cout << "south:      " << brd.pastMask.south << std::endl;
@@ -136,6 +233,7 @@ namespace Chess5D
     std::cout << "southwest:  " << brd.pastMask.southwest << std::endl;
     std::cout << "northwest:  " << brd.pastMask.northwest << std::endl;
     std::cout << "center:     " << brd.pastMask.center << std::endl;
+    */
         
     U64 combined = brd.pastMask.north | brd.pastMask.east | brd.pastMask.south | brd.pastMask.west |
                    brd.pastMask.northeast | brd.pastMask.southeast | brd.pastMask.southwest | brd.pastMask.northwest | brd.pastMask.center;
@@ -854,6 +952,82 @@ namespace Chess5D
     constexpr bool promotion = Type == Promotion || Type == PromoCapture;
     constexpr bool castle = Type == Castle;
 
+    const Piece piece = board.mailboxBoard[move.from];
+
+    const U64 fromMask = 1ull << move.from;
+    const U64 toMask   = 1ull << move.to;
+
+    // 1. Clear piece from source
+    board.mailboxBoard[move.from] = NoPiece;
+    board.bitBoard[piece]        &= ~fromMask;
+    bitBoard<White, NoType>()    &= ~fromMask;
+    board.occ                    &= ~fromMask;
+
+    // 2. Handle captures
+    if (capture) {
+        const U8 capSq = enpassant ? move.special1 : move.to;
+        const U64 capMask = 1ull << capSq;
+        Piece captured = board.mailboxBoard[capSq];
+
+        if (captured != NoPiece) {
+            board.bitBoard[captured]    &= ~capMask;
+            bitBoard<!White, NoType>()  &= ~capMask;
+            board.mailboxBoard[capSq]   = NoPiece;
+        }
+        board.occ &= ~capMask;
+    }
+
+    // 3. Handle promotions
+    Piece placed = promotion ? Piece(move.special1) : piece; // must be piece type of promotion target
+
+    // 4. Place moved piece
+    board.mailboxBoard[move.to] = placed;
+    board.bitBoard[placed]     |= toMask;
+    bitBoard<White, NoType>()  |= toMask;
+    board.occ                  |= toMask;
+
+    // 5. Handle castling
+    if (castle) {
+      const U64 rookFromMask = 1ull << move.special1;
+      const U64 rookToMask   = 1ull << move.special2;
+
+      // clear rook from source
+      board.mailboxBoard[move.special1] = NoPiece;
+      board.bitBoard[toPiece(White, Rook)] &= ~rookFromMask;
+      bitBoard<White, NoType>()           &= ~rookFromMask;
+      board.occ                           &= ~rookFromMask;
+
+      // place rook at destination
+      board.mailboxBoard[move.special2] = toPiece(White, Rook);
+      board.bitBoard[toPiece(White, Rook)] |= rookToMask;
+      bitBoard<White, NoType>()            |= rookToMask;
+      board.occ                            |= rookToMask;
+      
+      // Clear unmoved flag for rook
+      board.unmoved &= ~rookFromMask;
+    }
+
+    // 6. Handle en passant cleanup
+    if (enpassant) {
+        board.mailboxBoard[move.special1] = NoPiece;
+    }
+
+    // 7. Update auxiliary state
+    board.unmoved   &= ~(fromMask | toMask);
+    board.epTarget   = push ? toMask : 0;
+  }
+  
+  /* old ver
+    template <U8 Set>
+  template <bool White, MoveType Type>
+  _Compiletime void Board<Set>::makeMove(const Move &move)
+  {
+    constexpr bool capture = Type == Capture || Type == Enpassant || Type == PromoCapture;
+    constexpr bool push = Type == Push;
+    constexpr bool enpassant = Type == Enpassant;
+    constexpr bool promotion = Type == Promotion || Type == PromoCapture;
+    constexpr bool castle = Type == Castle;
+
     const U64 from = castle ? 1ull << move.from | 1ull << move.to
                             : 1ull << move.from;
     const U64 to = castle      ? 1ull << move.special1 | 1ull << move.special2
@@ -893,6 +1067,7 @@ namespace Chess5D
       board.mailboxBoard[move.special1] = NoPiece;
       
   }
+  */
 
   template <U8 Set>
   template <bool White, bool Capture>
@@ -915,6 +1090,7 @@ namespace Chess5D
     board.mailboxBoard[move.to] = piece;
   }
 
+  //Generates pinMasks checkMasks, generates banMask
   template <U8 Set>
   template <bool White>
   _Compiletime void Board<Set>::refresh(TimelineInfo &info)
@@ -924,7 +1100,13 @@ namespace Chess5D
     info.pinHV = EMPTY;
     info.pinD12 = EMPTY;
     info.doublePin = EMPTY;
-
+    
+    for (U8 i = 0; i < 64; ++i)
+    {
+      info.checkMasks[i] = EMPTY;
+      info.pinMasks[i] = EMPTY;
+    }
+    
     // Curent royalty
     U64 royal = royalty(White);
 

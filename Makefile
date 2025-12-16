@@ -1,34 +1,67 @@
-FLAGS = -w -m64 -mbmi -std=c++20 -O2 -march=native
-STACK_SIZE = 8000000  # Adjust as needed
+CXX = g++
+OUTPUT_DIR = out
+
+STACK_SIZE = 8000000
+
 OUTPUT_MAIN = main.exe
 OUTPUT_TEST = test.exe
-OUTPUT_DIR= out
+OUTPUT_GUI  = gui.exe
+OUTPUT_OPT  = opt.exe
+
+CXXFLAGS = -m64 -mbmi -std=c++20 -O1 -march=native -w -Wno-narrowing
+LDFLAGS  = -Wl,--stack,$(STACK_SIZE)
 
 ifeq ($(filter openmp,$(MAKECMDGOALS)),openmp)
-    FLAGS += -fopenmp
+    CXXFLAGS += -fopenmp
 endif
 
-all: compile_main link_main clean run
+.PHONY: all main test gui opt run run_test run_gui run_opt clean
 
-testAll: compile_test link_test clean run_test
+all: main
+
+main: compile_main link_main clean run 
+
+test: compile_test link_test clean run_test 
+
+gui: compile_gui link_gui clean run_gui 
+
+opt: compile_opt link_opt clean run_opt
 
 compile_main:
-	g++ -c -g main.cpp $(FLAGS) -o main.o
+	$(CXX) -c -g main.cpp $(CXXFLAGS) -o main.o
 
 link_main:
-	g++ main.o -o $(OUTPUT_MAIN) -Wl,--stack,$(STACK_SIZE) $(FLAGS)
+	$(CXX) main.o -o $(OUTPUT_DIR)/$(OUTPUT_MAIN) $(CXXFLAGS) $(LDFLAGS)
 
 run:
-	.\$(OUTPUT_MAIN)
+	.\$(OUTPUT_DIR)\$(OUTPUT_MAIN)
 
 compile_test:
-	g++ -c test.cpp $(FLAGS) -o test.o
+	$(CXX) -c test.cpp $(CXXFLAGS) -o test.o
 
 link_test:
-	g++ test.o -o out/$(OUTPUT_TEST) -lgtest_main -lgtest -Wl,--stack,$(STACK_SIZE) $(FLAGS)
+	$(CXX) test.o -o $(OUTPUT_DIR)/$(OUTPUT_TEST) $(LDFLAGS) -lgtest_main -lgtest
 
 run_test:
-	.\$(OUTPUT_TEST)
+	.\$(OUTPUT_DIR)\$(OUTPUT_TEST)
+
+compile_gui:
+	$(CXX) -c -Ilib websocket.cpp $(CXXFLAGS) -o gui.o
+
+link_gui:
+	$(CXX) gui.o -o $(OUTPUT_DIR)/$(OUTPUT_GUI) $(LDFLAGS) -lws2_32
+
+run_gui:
+	.\$(OUTPUT_DIR)\$(OUTPUT_GUI)
+
+compile_opt:
+	$(CXX) -c -g optimize.cpp $(CXXFLAGS) -o opt.o
+
+link_opt:
+	$(CXX) opt.o -o $(OUTPUT_DIR)/$(OUTPUT_OPT) $(CXXFLAGS) $(LDFLAGS)
+
+run_opt:
+	.\$(OUTPUT_DIR)\$(OUTPUT_OPT)
 
 clean:
-	del main.o test.o
+	del main.o test.o gui.o opt.o

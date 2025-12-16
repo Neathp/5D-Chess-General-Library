@@ -1,7 +1,7 @@
 #include <algorithm>
 #include "chess.hpp"
 #include <string>
-
+//TODO: Positions should not be compiletime, should be just be a file to read from.
 namespace Positions
 {
     template <typename Chess>
@@ -12,7 +12,7 @@ namespace Positions
             std::string fen = "[r*nbqk*bnr*/p*p*p*p*p*p*p*p*/8/8/8/8/P*P*P*P*P*P*P*P*/R*NBQK*BNR*:0:1:w]\n";
             chess.importFen(fen);
         }
-        if(posNumber == 1)
+        else if(posNumber == 1)
         {
             std::string fen = "[r*nbqk*bnr*/p*p*p*p*p*p*p*p*/8/8/8/8/P*P*P*P*P*P*P*P*/R*NBQK*BNR*:0:1:w]\n";
             chess.importFen(fen);
@@ -44,10 +44,10 @@ namespace Positions
 
             chess.importFen(fen);
             std::string pgn = "1. (0T1)Bb3a2 / (0T1)Bc8d7\n"
-                              "2. (0T2)Ba2b3 / (0T2)Bd7c8\n"
+                              "2. (0T2)Ba2b3 / (0T2)Bd7c8\n";
             // prep
-            "3. (0T3)Bb3f7 / (0T3)Kf8f7\n"
-            "4. (0T4)Ng3f5 / (0T4)Bc8f5\n";
+            //"3. (0T3)Bb3f7 / (0T3)Kf8f7\n";
+            //"4. (0T4)Ng3f5 / (0T4)Bc8f5\n";
             //"5. (0T5)Bf4b8 / (0T5)Qb7b8\n"
             //"6. (0T6)Qd1b3 / (0T6)Bf5e6\n";
 
@@ -132,7 +132,8 @@ namespace Positions
             chess.importPGN(pgn);
         }
         else if(posNumber == 7){
-            std::string fen = "[3qk*b1r*/2p*p*1p*1p*/bpn1p1pn/pN6/P3N2P/1PB1PQ2/2P*2P*P*R/R*3K*B2:0:1:w]"; // Tesseract mate in 6
+            //std::string fen = "[3qk*b1r*/2p*p*1p*1p*/bpn1p1pn/pN6/P3N2P/1PB1PQ2/2P*2P*P*R/R*3K*B2:0:1:w]"; // Tesseract mate in 6
+            std::string fen = "[3qk*b1r*/2p*p*1p*1p*/bpn1p1pn/1N6/4N3/2B1PQ2/5P*P*1/4K*B2:0:1:w]"; // Tesseract mate in 6 modified
             chess.importFen(fen);
         }
         else if(posNumber == 8){
@@ -145,7 +146,7 @@ namespace Positions
             chess.importPGN(pgn);
         }
         else if(posNumber == 9){
-            std::string fen = "[r*nbqk*1r*1/p*p*p*p*1p*p*1/4pnB1/7p/3P4/3Q4/P*P*P*1P*P*P*P*/R*NB1K*B1R*:0:1:w]\n";//Mate in 8
+            std::string fen = "[r*nbqk*1r*1/p*p*p*p*1p*p*1/4pnB1/7p/3P4/3Q4/P*P*P*1P*P*P*P*/R*NB1K*B1R*:0:1:w]\n";//Mate in 7
             chess.importFen(fen);
         }
         else if(posNumber == 10){
@@ -162,6 +163,119 @@ namespace Positions
             //"4. (0T4)Qf3f6\n";
             chess.importPGN(pgn);
         }
+        else if(posNumber == 12){
+            std::string fen = "[r*nbqk*bnr*/p*p*p*p*p*p*p*p*/8/8/8/8/P*P*P*P*P*P*P*P*/R*NBQK*BNR*:0:1:w]\n";
+            chess.importFen(fen);
 
+            std::string pgn = "1.{10:03}(0T1)e2e3 / {10:03}(0T1)g7g6\n"
+                              "2.{10:02}(0T2)Qd1f3 / {10:01}(0T2)d7d6\n"
+                              "3.{10:01}(0T3)Bf1c4"; // / {10:01}(0T3)h7h5\n";
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 13){ //Nikita Custom Position
+            std::string fen = "[r*3k*2r*/p*p*3p*p*p*/1npqpn2/3p4/3P4/2P1PP2/P*P*4P*P*/R*N2K*q1R*:0:1:w]\n";
+            chess.importFen(fen);
+
+            std::string pgn = "1. {10:03}(0T1)Ke1f1\n";
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 14){ //Castle Test
+            std::string fen = "[k*2p*4/3p*4/2p*P*4/2P*5/3p*4/2p*P*1p*1p*/2P*2P*1P*/4K*2R*:0:1:w]\n";
+            chess.importFen(fen);
+
+            std::string pgn = "1. (0T1)Ke1g1 {-1} / (0T1)Ka8a7 {919}\n"
+                               "2. (0T2)Rf1c1 {-20} / (0T2)Ka7a8 {919}\n";
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 15){ //JLM Mate in 4
+            std::string fen = "[r*nbq1b1r*/p*p*p*p*p*kp*1/8/3n3p/3P1B2/P7/1P*P*1P*P*P*P*/R*N1QK*BNR*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 16){ //Mage Mate in 6
+            std::string fen = "[r*1b2rk1/p*2p*1p*b1/npq3pp/2p5/4P1n1/1P3NP1/P*BP*P*1P*BP*/R*NQ2RK1:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 17){ //Mage Mate in 6 Close Door
+            std::string fen = "[brkq2r1/p*1p*p*b2p*/1pn4p/8/3N4/1P2PNP1/P*1P*P*1P*Q1/R*3K*B1R*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 18){ //Andrey Mate in 4
+            std::string fen = "[r*3k*b1r*/p*p*p*1p*p*2/2n4p*/3p2N1/3Pn2B/2P1P3/P*P*2BP*q1/R*N1QK*2R*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 19){ //Macfor Mate in 5 w/Travel Mate in 6 wo/Travels
+            std::string fen = "[r*3k*b1r*/p*p*p*1p*p*2/2n4p*/3p2N1/3Pn2B/2P1P3/P*P*2BP*q1/R*N1QK*2R*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 20){ //Hexa Mate in 5
+            std::string fen = "[r*n2k*q1r*/p*bp*2p*1Q/1p1pp3/6p1/P1N1B1n1/B1P1PN2/3P*1P*P*1/R*3K*3:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 21){ //Narik Mate in 5, if there is an issue with this its likely because of the 2 kings //TODO: Add to test
+            std::string fen = "[3rk*1rk/3p*1p*n1/1p1qpBpq/p6p/2n1Q3/5NP1/4B2N/R*3K*3:0:1:w]\n";
+            chess.importFen(fen);
+            /*
+            std::string pgn = "1. (0T1)Qe4e6 {932} / (0T1)Pf7e6 {677}\n";
+                                // "2. (0T2)Nh2f1 {-425} / (0T2)Qd6g3 {4142}\n"
+                                // "3. (0T3)Nf1g3 {507} / (0T3)Nc4e3 {-833}"
+            chess.importPGN(pgn);
+            */
+        }
+        else if(posNumber == 22){ //Los Inspired by Mage Mate in 4
+            std::string fen = "[r*qb1k*b1r*/p*2p*p*p*p*p*/4n2n/7B/2pN4/2P1PN2/P*P*1B1P*P*P*/R*2QK*2R*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 23){ //Mage Sarp Knight Mate in 4
+            std::string fen = "[r*3k*2r*/p*p*q2p*1p*/2p1p1p1/4nn2/3PN3/2P5/P*P*1Q1P*P*P*/R*4RK1:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 24){ //Los Original Mate in 4
+            std::string fen = "[1r4k1/2q1bp*p*1/4p2p/pB1p4/3Bn3/3QPN1P/3P*1P*P*1/R*3K*2R*:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 25){ //Nikita REALLY wants this Mate in ?
+            std::string fen = "[k*7/p*n6/K*7/8/8/8/6P*B/8:0:1:w]\n";
+            chess.importFen(fen);
+        }
+        else if(posNumber == 26)
+        { // f7Sac Test
+            std::string fen = "[r*nbqk*bnr*/p*p*p*p*p*p*p*p*/8/8/8/8/P*P*P*P*P*P*P*P*/R*NBQK*BNR*:0:1:w]\n";
+            chess.importFen(fen);
+            std::string pgn = "1. (0T1)Ng1f3 / (0T1)Ng8f6\n"
+                              "2. (0T2)d2d4 / (0T2)d7d6\n"
+                              "3. (0T3)c2c3 / (0T3)c7c6\n"
+                              "3. (0T4)Qd1b3 / (0T4)d6d5\n";
+
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 27){ //Castling Test
+            std::string fen = "[r*nbqk*bnr*/p*p*p*p*p*p*p*p*/8/8/8/8/P*P*P*P*P*P*P*P*/R*NBQK*BNR*:0:1:w]\n";
+            chess.importFen(fen);
+            std::string pgn = "1. (0T1)Ng1f3 / (0T1)Ng8f6\n"
+                                "2. (0T2)d2d4 / (0T2)d7d5\n"
+                                "3. (0T3)c2c3 / (0T3)c7c6\n"
+                                "4. (0T4)Bc1f4 / (0T4)Bc8f5\n"
+                                "5. (0T5)e2e3 / (0T5)e7e6\n"
+                                "6. (0T6)Bf1d3 / (0T6)Bf5d3\n"
+                                "7. (0T7)Qd1d3 / (0T7)Bf8d6\n"
+                                "8. (0T8)Bf4d6 / (0T8)Qd8d6\n"
+                                "9. (0T9)Nb1d2 / (0T9)Nb8d7\n";
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 28){ // Eval Knight Test
+            std::string fen = "[r*3k*2r*/p*b1p*1p*bp*/npq1pnp1/2p5/2P5/1PNBP2P/P*BQP*1P*P*1/R*3K*2R*:0:1:w]\n";
+            chess.importFen(fen);
+            std::string pgn = "1. (0T1)Be4 / (0T1)Nb4\n"
+                                "2. (0T2)Bd3 / (0T2)Na6\n"
+                                "3. (0T3)Be4 / (0T3)Nb4\n"
+                                "4. (0T4)Bd3 / (0T4)Na6\n"
+                                "5. (0T5)Be4 / (0T5)Nb4\n"
+                                "6. (0T6)Bd3 / (0T6)Na6\n";
+            chess.importPGN(pgn);
+        }
+        else if(posNumber == 29){ //QSaerch Test
+            std::string fen = "[4k*r*2/3p*p*p*2/r*7/8/q7/5R*2/1P*P*5/1K*R*5:0:1:w]\n";
+            chess.importFen(fen);
+        }
     }
 }

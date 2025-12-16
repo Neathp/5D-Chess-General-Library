@@ -33,6 +33,7 @@ struct TranspositionTable {
         U64 ep[FILES]; //Considers that pawns cant start on anything besides second rank
         U64 unmoved[NUM_SQS];
         U64 past[NUM_SQS];
+        U64 pastDir[9]; 
     } zobrist;
     
 
@@ -45,8 +46,8 @@ struct TranspositionTable {
         // Initialize random number generator for Zobrist hashing
         std::random_device rd;
         auto rand=rd();
-        std::cout<<rand<<std::endl;
-        rng.seed(rand);
+        rng.seed(64);
+        //rng.seed(rand);
 
         // Initialize Zobrist keys
         initZobristKeys();
@@ -67,11 +68,14 @@ struct TranspositionTable {
         for (int file = 0; file < FILES; ++file) {
             zobrist.ep[file]=dist(rng);
         }
+        for (int d = 0; d < 9; ++d)
+            zobrist.pastDir[d] = dist(rng); 
     }
 
     // Clear the transposition table
     void clear() {
         table.clear();
+        table.rehash(0);
     }
 
     // Compute Zobrist hash key for the current board position
@@ -97,23 +101,44 @@ struct TranspositionTable {
             const U8 um = SquareOf(unmoved);
             key ^=zobrist.unmoved[um];
         }
-        U64 past=brd.pastMask.center | brd.pastMask.north | brd.pastMask.south | brd.pastMask.northeast | brd.pastMask.southeast | brd.pastMask.southwest | brd.pastMask.northwest;
+        
+        // Dirty way of doing past masks
+        /*
+        U64 past=brd.pastMask.center |  brd.pastMask.east | brd.pastMask.northeast | brd.pastMask.north | brd.pastMask.northwest | brd.pastMask.west |  brd.pastMask.southwest | brd.pastMask.south | brd.pastMask.southeast;
         Bitloop(past)
         {
             const U8 pst = SquareOf(past);
             key ^=zobrist.past[pst];
         }
+        */
+        
+        auto addPast = [&](U64 mask, int dir) {
+            Bitloop(mask) {
+                const U8 sq = SquareOf(mask);
+                key ^= zobrist.past[sq] ^ zobrist.pastDir[dir];
+            }
+        };
+        
+        addPast(brd.pastMask.center, 0);
+        addPast(brd.pastMask.north, 1);
+        addPast(brd.pastMask.northeast, 2);
+        addPast(brd.pastMask.east, 3);
+        addPast(brd.pastMask.southeast, 4);
+        addPast(brd.pastMask.south, 5);
+        addPast(brd.pastMask.southwest, 6);
+        addPast(brd.pastMask.west, 7);
+        addPast(brd.pastMask.northwest, 8);
+        
         return key;
     }
 
-    // Retrieve an entry from the transposition table
-    TTEntry& probe(U64 key) {
-        TTEntry& entry = table[key];
-        return entry;
+    TTEntry* probe(U64 key) {
+        auto it = table.find(key);
+        return (it != table.end()) ? &it->second : nullptr;
     }
 
     // Store an entry in the transposition table
     void store(const TTEntry& entry) {
-        table[entry.key] = entry;
+        table[entry.key] = entry; //Replacement policy likely needed to prefer deeper searches
     }
 };

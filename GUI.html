@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>5D Chess</title>
+    <script src="https://unpkg.com/5d-chess-js/dist/5d-chess.js"></script>
+    <script src="https://unpkg.com/5d-chess-renderer/dist/5d-chess-renderer.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <div style="height: 5%; width: 100%;">
+      <button id='undoButton'>Undo</button>
+      <button id='submitButton'>Submit</button>
+      <button id='presentButton'>Show Present Board</button>
+      <button id='fullBoardButton'>Show Full Board</button>
+      <button id='enableDrawModeButton'>Enable Draw Mode</button>
+      <button id='enableMiddleDrawModeButton'>Enable Draw Mode (Middle)</button>
+      <button id='disableDrawModeButton'>Disable Draw Mode</button>
+      <button id='consolePGN'>Log PGN</button>
+    </div>
+    <div id="main" style="height: 95%; width: 100%;"></div>
+    <script type="text/javascript">
+        const socket = new WebSocket("ws://127.0.0.1:8083");
+        socket.onopen = () => console.log("WebSocket Connected");
+
+        socket.onmessage = (event) => {
+          const moves = JSON.parse(event.data);
+          for (let m of moves) {
+            console.log("Received move:", m);
+            window.chess.move(m);
+          }
+          try {
+            console.log(window.chess);
+            window.chess.submit();
+          } catch (e) {
+            console.error("Validation error:", e);
+          }
+          updateBoard();
+          window.cr.zoom.present(true, 1.5);
+        };
+
+        function updateBoard() {
+            var tmpChess = window.chess.copy();
+
+            window.futureAvailableMoves = tmpChess.moves('object', false, false, false);
+            window.cr.global.sync(window.chess);
+            window.cr.global.availableMoves(window.chess.moves('object', false, false, false));
+            window.cr.global.pastAvailableMoves([pastAvailableMoves, futureAvailableMoves].flat());
+        }
+
+      document.body.style.height = `${window.innerHeight}px`;
+      document.body.style.width = `${window.innerWidth}px`;
+      window.addEventListener('resize', () => {
+        document.body.style.height = `${window.innerHeight}px`;
+        document.body.style.width = `${window.innerWidth}px`;
+      });
+      window.cr = new ChessRenderer();
+      window.cr.global.attach(document.getElementById('main'));
+      window.chess = new Chess();
+      window.chess.skipDetection = true;
+      window.chess.enableConsole = true;
+      window.pastAvailableMoves = [];
+      window.currentAvailableMoves = window.chess.moves('object', false, false, false);
+      updateBoard();
+      window.cr.zoom.present(true, 1.5);
+        
+      window.cr.on('moveSelect', (m) => {
+        var move = m;
+        window.chess.move(m);
+        updateBoard();
+      });
+      document.getElementById('undoButton').onclick = () => {
+        window.chess.undo();
+        updateBoard();
+      }
+      document.getElementById('submitButton').onclick = () => {
+        if(window.chess.submittable()===false) {
+          console.log("Not submittable");
+          return;
+        }
+        //Loop trough move buffer
+        var pgn = "";
+        console.log("Move Buffer: ", window.chess.moveBuffer);
+
+        var rawMoves=[]
+        //Convert to PGN
+        for(let i=0; i< window.chess.moveBuffer.length; i++) {
+          var curMove=window.chess.moveBuffer[i]
+          console.log(curMove);
+          var rawMove=window.chess.raw.parseFuncs.toMove(curMove, false)
+          rawMoves.push(rawMove)
+        }
+
+        //Submit Local
+        window.chess.submit()
+        window.pastAvailableMoves.push(window.currentAvailableMoves);
+        window.pastAvailableMoves = window.pastAvailableMoves.flat();
+        window.currentAvailableMoves = window.chess.moves('object', false, false, false);
+
+        //Convert to PGN
+        /* Was not properly disambiguating moves
+        for(let i=0; i<rawMoves.length; i++) {
+          if(i!=0) {pgn+=" "}
+          pgn+=window.chess.raw.pgnFuncs.fromMove(rawMoves[i], chess.rawBoard, chess.rawAction, '', true, true, true)
+        }
+        */
+
+        pgn=window.chess.export("5dpgn")
+        console.log(pgn)
+        pgn=pgn.split("\n").slice(-1)[0] //Get last line only
+        pgn = pgn.replace(/\d+\.\s*/g, "");
+        pgn=pgn.split("/").slice(-1)[0]
+        
+        //Send to AI
+        console.log(pgn)
+        socket.send(pgn);
+        updateBoard();
+        window.cr.zoom.present(true, false);
+      }
+      document.getElementById('presentButton').onclick = () => {
+        window.cr.zoom.present(true, 1.5);
+      }
+      document.getElementById('fullBoardButton').onclick = () => {
+        window.cr.zoom.fullBoard();
+      }
+      document.getElementById('enableDrawModeButton').onclick = () => {
+        window.cr.render.customArrowManager.enableCustomArrowMode(null, false);
+      }
+      document.getElementById('enableMiddleDrawModeButton').onclick = () => {
+        window.cr.render.customArrowManager.enableCustomArrowMode();
+      }
+      document.getElementById('disableDrawModeButton').onclick = () => {
+        window.cr.render.customArrowManager.disableCustomArrowMode();
+      }
+      document.getElementById('consolePGN').onclick = () => {
+        console.log(window.chess.export("5dpgn"));
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'f') {
+          document.getElementById('submitButton').click();
+        }
+      });
+    </script>
+  </body>
+  
+</html>
